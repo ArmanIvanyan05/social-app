@@ -1,56 +1,66 @@
-// import React from "react";
-import { useState } from "react";
+import { useState } from 'react';
 import {
-  MDBContainer,
   MDBCard,
   MDBCardBody,
-  MDBCardImage,
-  MDBRow,
   MDBCol,
+  MDBContainer,
   MDBInput,
-} from "mdb-react-ui-kit";
-import { Link, useNavigate } from "react-router-dom";
-import { SubmitHandler, useForm } from "react-hook-form";
-import { IUser } from "../../helpers/types";
-import { handleLogin } from "../../helpers/api";
+  MDBRow,
+} from 'mdb-react-ui-kit';
+import { Link, useNavigate } from 'react-router-dom';
+import { useForm, type SubmitHandler } from 'react-hook-form';
+import { getErrorMessage, loginUser } from '../../helpers/api';
+import type { LoginPayload } from '../../helpers/types';
 
 export function Login() {
-  const { register, handleSubmit } = useForm<IUser>();
-  const [error, setError] = useState<string>("");
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<LoginPayload>();
+  const [error, setError] = useState('');
   const navigate = useNavigate();
-  const loginHandler:SubmitHandler<IUser> = (user) => {
-    handleLogin(user)
-    .then(response => {
-        if (response.status === "error" && response.message) {
-            setError(response.message);
-        } else {
-            setError("");
-            navigate("/profile");
-        }
-    })
-  }
+
+  const loginHandler: SubmitHandler<LoginPayload> = async payload => {
+    setError('');
+    try {
+      await loginUser(payload);
+      navigate('/profile/posts', { replace: true });
+    } catch (requestError) {
+      setError(getErrorMessage(requestError));
+    }
+  };
 
   return (
     <MDBContainer fluid>
       <MDBRow className="d-flex justify-content-center align-items-center">
         <MDBCol lg="8">
-          <MDBCard className="my-5 rounded-3" style={{ maxWidth: "600px" }}>
-            <MDBCardImage
-              src="https://mdbcdn.b-cdn.net/img/Photos/new-templates/bootstrap-registration/img3.webp"
-              className="w-100 rounded-top"
-              alt="Sample photo"
-            />
+          <MDBCard className="my-5 rounded-3" style={{ maxWidth: '600px' }}>
             <MDBCardBody className="px-5">
-              <h3 className="mb-4 pb-2 pb-md-0 mb-md-5 px-md-2">Login Info</h3>
+              <h1 className="mb-4">Log in</h1>
               <p>
-                Don't you have an account? <Link to={"/"}>Signup Now</Link>
+                Need an account? <Link to="/">Create one</Link>
               </p>
               <form onSubmit={handleSubmit(loginHandler)}>
-                {error && <p className="text-danger">{error}</p>}
-                <MDBInput wrapperClass="mb-4" label="Login" type="text" {...register('login')}/>
-                <MDBInput wrapperClass="mb-4" label="Password" type="password" {...register('password')}/>
-                <button type="submit" className="btn btn-outline-info">
-                  Submit
+                {error && <p role="alert" className="alert alert-danger">{error}</p>}
+                <MDBInput
+                  wrapperClass="mb-4"
+                  label="Email"
+                  type="email"
+                  autoComplete="email"
+                  {...register('email', { required: 'Email is required' })}
+                />
+                {errors.email && <p role="alert">{errors.email.message}</p>}
+                <MDBInput
+                  wrapperClass="mb-4"
+                  label="Password"
+                  type="password"
+                  autoComplete="current-password"
+                  {...register('password', { required: 'Password is required' })}
+                />
+                {errors.password && <p role="alert">{errors.password.message}</p>}
+                <button disabled={isSubmitting} type="submit" className="btn btn-outline-info">
+                  {isSubmitting ? 'Logging in…' : 'Log in'}
                 </button>
               </form>
             </MDBCardBody>
