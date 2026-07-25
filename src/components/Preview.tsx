@@ -1,161 +1,139 @@
-import Box from "@mui/material/Box";
-import Modal from "@mui/material/Modal";
-import { getPost, handleComment } from "../helpers/api";
-import { BASE, DEF } from "../helpers/default";
-import { useEffect, useState } from "react";
-import { IPost } from "../helpers/types";
-import { Link } from "react-router-dom";
+import { useEffect, useState } from 'react';
+import {
+  createComment,
+  deleteComment,
+  getComments,
+  getErrorMessage,
+  updateComment,
+} from '../helpers/api';
+import type { IComment, IPost } from '../helpers/types';
 
-const style = {
-  position: "absolute",
-  top: "50%",
-  left: "50%",
-  transform: "translate(-50%, -50%)",
-  width: 900,
-  height: 500,
-  bgcolor: "background.paper",
-  border: "2px solid #000",
-  boxShadow: 24,
-  p: 4,
-  display: "flex",
-};
-
-interface IProps {
-  isOpen: boolean;
-  close: () => void;
-  post: number;
+interface Props {
+  accountId: string;
+  post: IPost;
+  onError: (message: string) => void;
 }
 
-export function Preview({ isOpen, close, post }: IProps) {
-  const [currentPost, setCurrentPost] = useState<IPost | null>(null);
-  const [commentText, setCommentText] = useState<string>("");
+export function Preview({ accountId, post, onError }: Props) {
+  const [comments, setComments] = useState<IComment[]>([]);
+  const [content, setContent] = useState('');
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editContent, setEditContent] = useState('');
 
   useEffect(() => {
-    if (isOpen && post) {
-      getPost(post).then((response) => {
-        setCurrentPost(response.payload);
+    let active = true;
+    getComments(post._id)
+      .then(result => {
+        if (active) setComments(result);
+      })
+      .catch(error => {
+        if (active) onError(getErrorMessage(error));
       });
-    }
-  }, [isOpen, post]);
+    return () => {
+      active = false;
+    };
+  }, [onError, post._id]);
 
-  const writeComment = () => {
-    if (commentText.trim() !== "" && currentPost) {
-      handleComment(currentPost.id, { text: commentText }).then((response) => {
-        setCommentText("");
-        setCurrentPost((post) => {
-          if (post) {
-            return {
-              ...post,
-              comments: [...post.comments, response.payload],
-            };
-          }
-          return post;
-        });
-      });
+  const addComment = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    onError('');
+    try {
+      const comment = await createComment(post._id, content);
+      setComments(current => [...current, comment]);
+      setContent('');
+    } catch (error) {
+      onError(getErrorMessage(error));
+    }
+  };
+
+  const saveComment = async (commentId: string) => {
+    onError('');
+    try {
+      const comment = await updateComment(post._id, commentId, editContent);
+      setComments(current =>
+        current.map(item => (item._id === commentId ? comment : item))
+      );
+      setEditingId(null);
+    } catch (error) {
+      onError(getErrorMessage(error));
+    }
+  };
+
+  const removeComment = async (commentId: string) => {
+    onError('');
+    try {
+      await deleteComment(post._id, commentId);
+      setComments(current => current.filter(item => item._id !== commentId));
+    } catch (error) {
+      onError(getErrorMessage(error));
     }
   };
 
   return (
-    <Modal
-      open={isOpen}
-      onClose={close}
-      aria-labelledby="modal-modal-title"
-      aria-describedby="modal-modal-description"
-    >
-      <Box sx={style}>
-        {currentPost ? (
-          <>
-            <div style={{ flex: 1, marginRight: "16px" }}>
-              <img
-                src={BASE + currentPost.picture}
-                alt="Post"
-                style={{ width: "400px", height: "400px", objectFit: "cover" }}
-              />
-            </div>
-            <div style={{ flex: 1 }}>
-              <div>
-                <strong>{currentPost.likes.length} likes</strong>,{" "}
-                <strong>{currentPost.comments.length} comments</strong>
-              </div>
-
-              <p>
-                <strong>Likes:</strong>
-              </p>
-              <div
-                style={{
-                  maxHeight: "120px",
-                  overflowY: "auto",
-                  marginBottom: "8px",
-                  padding: "8px",
-                  border: "1px solid #ccc",
-                  borderRadius: "4px",
-                }}
-              >
-                {currentPost.likes.map((user) => (
-                  <div
-                    key={user.id}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      marginBottom: "8px",
+    <section aria-labelledby={`comments-${post._id}`}>
+      <h2 id={`comments-${post._id}`}>Comments</h2>
+      {comments.length === 0 ? (
+        <p>No comments yet.</p>
+      ) : (
+        <ul>
+          {comments.map(comment => (
+            <li key={comment._id}>
+              <strong>{comment.author.username}:</strong>{' '}
+              {editingId === comment._id ? (
+                <form
+                  onSubmit={event => {
+                    event.preventDefault();
+                    void saveComment(comment._id);
+                  }}
+                >
+                  <label htmlFor={`edit-comment-${comment._id}`}>
+                    Edit comment
+                  </label>
+                  <input
+                    id={`edit-comment-${comment._id}`}
+                    value={editContent}
+                    onChange={event => setEditContent(event.target.value)}
+                  />
+                  <button type="submit">Save comment</button>{' '}
+                  <button type="button" onClick={() => setEditingId(null)}>
+                    Cancel
+                  </button>
+                </form>
+              ) : (
+                comment.content
+              )}
+              {comment.author._id === accountId && editingId !== comment._id && (
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingId(comment._id);
+                      setEditContent(comment.content);
                     }}
                   >
-                    <img
-                      src={user.picture ? BASE + user.picture : DEF}
-                      alt={`${user.name} ${user.surname}`}
-                      style={{
-                        width: "30px",
-                        height: "30px",
-                        borderRadius: "50%",
-                        marginRight: "8px",
-                      }}
-                    />
-                    <Link to={`/profile/${user.id}`} onClick={close}>
-                      {user.name} {user.surname}
-                    </Link>
-                  </div>
-                ))}
-              </div>
-              <p>
-                <strong>Comments:</strong>
-              </p>
-              <div
-                style={{
-                  maxHeight: "120px",
-                  overflowY: "auto",
-                  marginBottom: "8px",
-                  padding: "8px",
-                  border: "1px solid #ccc",
-                  borderRadius: "4px",
-                }}
-              >
-                {currentPost.comments.map((comment) => (
-                  <div key={comment.id} style={{ marginBottom: "8px" }}>
-                    <strong>{comment.user.name} says:</strong>
-                    <p>{comment.content}</p>
-                  </div>
-                ))}
-              </div>
-              <br></br>
-              <input
-                type="text"
-                value={commentText}
-                onChange={(e) => setCommentText(e.target.value)}
-                placeholder="What do you think?"
-                style={{ width: "100%", padding: "8px", marginTop: "8px" }}
-              />
-              <button
-                onClick={writeComment}
-                style={{ marginTop: "8px", width: "100%" }}
-              >
-                Comment
-              </button>
-            </div>
-          </>
-        ) : (
-          <p>Loading...</p>
-        )}
-      </Box>
-    </Modal>
+                    Edit comment
+                  </button>{' '}
+                  <button
+                    type="button"
+                    onClick={() => void removeComment(comment._id)}
+                  >
+                    Delete comment
+                  </button>
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+      <form onSubmit={addComment}>
+        <label htmlFor={`new-comment-${post._id}`}>Add a comment</label>
+        <input
+          id={`new-comment-${post._id}`}
+          value={content}
+          onChange={event => setContent(event.target.value)}
+        />
+        <button type="submit">Comment</button>
+      </form>
+    </section>
   );
 }

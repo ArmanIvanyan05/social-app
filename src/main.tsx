@@ -1,71 +1,70 @@
-import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
-import './index.css'
-import { createBrowserRouter, RouterProvider } from 'react-router-dom'
-import { Signup } from './pages/Signup'
-import { Login } from './pages/Login'
-import { Profile } from './pages/Profile/dashboard'
-import { Layout } from './pages/Profile/Layout'
-import { Photos } from './pages/Profile/photos'
-import { Settings } from './pages/Profile/settings'
-import { Search } from './pages/Profile/search'
-import { Account } from './pages/Profile/account'
-import { Requests } from './pages/Profile/requests'
-import { Followers } from './pages/followers'
-import { Followings } from './pages/followings'
+import { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
+import {
+  createBrowserRouter,
+  Navigate,
+  RouterProvider,
+} from 'react-router-dom';
+import './index.css';
+import { PublicOnly } from './components/PublicOnly';
+import { FeatureUnavailable } from './components/FeatureUnavailable';
+import { Login } from './pages/Login';
+import { Layout } from './pages/Profile/Layout';
+import { Photos } from './pages/Profile/photos';
+import { Signup } from './pages/Signup';
 
 const routes = createBrowserRouter([
   {
-    path:'',
-    element:<Signup/>
+    path: '/',
+    element: (
+      <PublicOnly>
+        <Signup />
+      </PublicOnly>
+    ),
   },
   {
-    path:'/login',
-    element:<Login/>
+    path: '/login',
+    element: (
+      <PublicOnly>
+        <Login />
+      </PublicOnly>
+    ),
   },
   {
     path: '/profile',
     element: <Layout />,
     children: [
-      {
-        path: '',
-        element: <Profile />
-      },
-      {
-        path: 'albums',
-        element: <Photos />
-      },
+      { index: true, element: <Navigate to="posts" replace /> },
+      { path: 'posts', element: <Photos /> },
+      { path: 'albums', element: <Photos /> },
       {
         path: 'settings',
-        element: <Settings />
+        element: <FeatureUnavailable feature="Settings" />,
       },
-      {
-        path: 'search',
-        element: <Search />
-      },
-      {
-        path: ':id',
-        element: <Account />
-      },
+      { path: 'search', element: <FeatureUnavailable feature="Search" /> },
       {
         path: 'requests',
-        element: <Requests />
+        element: <FeatureUnavailable feature="Follow requests" />,
       },
       {
         path: 'followers',
-        element: <Followers />
+        element: <FeatureUnavailable feature="Followers" />,
       },
       {
         path: 'followings',
-        element: <Followings />
+        element: <FeatureUnavailable feature="Following" />,
       },
-    ]
-  }
-])
+      {
+        path: ':id',
+        element: <FeatureUnavailable feature="User profile" />,
+      },
+    ],
+  },
+  { path: '*', element: <Navigate to="/" replace /> },
+]);
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <RouterProvider  router={routes}>
-    </RouterProvider>
-  </StrictMode>,
-)
+    <RouterProvider router={routes} />
+  </StrictMode>
+);

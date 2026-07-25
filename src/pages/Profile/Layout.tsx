@@ -1,40 +1,50 @@
-import { useEffect, useState } from "react";
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { handleLogout, verifyUser } from "../../helpers/api";
-import { IUser } from "../../helpers/types";
+import { useEffect, useState } from 'react';
+import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import {
+  getCurrentUser,
+  logoutUser,
+} from '../../helpers/api';
+import type { IUser } from '../../helpers/types';
 
 export const Layout = () => {
   const [account, setAccount] = useState<IUser | null>(null);
+  const [error, setError] = useState('');
   const navigate = useNavigate();
+
   useEffect(() => {
-    verifyUser().then((response) => {
-      if (!response.user) {
-        navigate("/login");
-      } else {
-        setAccount(response.user);
-      }
-    });
-  }, []);
+    let active = true;
+    getCurrentUser()
+      .then(user => {
+        if (active) setAccount(user);
+      })
+      .catch(() => {
+        if (!active) return;
+        logoutUser();
+        navigate('/login', { replace: true });
+      });
+    return () => {
+      active = false;
+    };
+  }, [navigate]);
 
   const logout = () => {
-    handleLogout().then(() => navigate("/login"));
+    logoutUser();
+    setAccount(null);
+    setError('');
+    navigate('/login', { replace: true });
   };
 
+  if (!account) return <p role="status">Restoring session…</p>;
+
   return (
-    account && (
-      <>
-        <nav>
-          <NavLink to="/profile" end>Profile</NavLink>
-          <NavLink to="/profile/settings">Settings</NavLink>
-          <NavLink to="/profile/search">Search</NavLink>
-          <NavLink to="/profile/followers">Followers</NavLink>
-          <NavLink to="/profile/followings">Followings</NavLink>
-          <NavLink to="/profile/requests">Requests</NavLink>
-          <NavLink to="/profile/albums">Photos</NavLink>
-          <button onClick={logout}>Log out</button>
-        </nav>
-        <Outlet context={{ account, setAccount }} />
-      </>
-    )
+    <>
+      <nav aria-label="Main navigation">
+        <span>Signed in as {account.username}</span>{' '}
+        <NavLink to="/profile/posts">Posts</NavLink>{' '}
+        <button type="button" onClick={logout}>Log out</button>
+      </nav>
+      {error && <p role="alert">{error}</p>}
+      <Outlet context={{ account, setAccount, setError }} />
+    </>
   );
 };
